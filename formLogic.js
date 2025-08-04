@@ -196,8 +196,8 @@ export async function processNameInput(message, env) {
     };
     try {
       if (user.mode === "candidate") {
-        await env[RESUME_KV].put(`${userId}_${Date.now()}`, JSON.stringify(result));
-      } else {
+        // Cloudflare KV binding names cannot contain dashes, must use underscore
+        // Try both in case
         await env[RESULTS_KV].put(`${userId}_${Date.now()}`, JSON.stringify(result));
       }
     } catch (e) {
