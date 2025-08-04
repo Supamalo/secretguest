@@ -114,6 +114,7 @@ export async function processNameInput(message, env) {
       return new Response('OK', { status: 200 });
     }
     const now = new Date();
+    const dateStr = `${now.getDate().toString().padStart(2, '0')}.${(now.getMonth()+1).toString().padStart(2, '0')}.${now.getFullYear()}`;
     const result = {
       telegramId: userId,
       username: message.from.username || '',
@@ -123,7 +124,7 @@ export async function processNameInput(message, env) {
       cafe: cafeNames[user.cafe],
       address: user.address,
       timestamp: now.toISOString(),
-      date: `${now.getDate().toString().padStart(2, '0')}.${(now.getMonth()+1).toString().padStart(2, '0')}.${now.getFullYear()}`
+      date: dateStr
     };
     // Сохраняем в KV
     try {
@@ -131,8 +132,12 @@ export async function processNameInput(message, env) {
     } catch (e) {
       // ignore
     }
-    // Отправляем в канал
-    const msg = `Точка проверена\n\nТайный гость: ${user.lastName} ${user.firstName}\nТелефон: ${phone}\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}`;
+    // Формируем сообщение для канала
+    let msg = `Точка проверена\n\nТайный гость: ${user.lastName} ${user.firstName}`;
+    if (message.from.username) {
+      msg += `\n@${message.from.username}`;
+    }
+    msg += `\nТелефон: ${phone}\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}\nДата: ${dateStr}`;
     await sendMessage(GROUP_ID, msg);
     await sendMessage(chatId, "Спасибо! Ваши данные отправлены.");
     userData.delete(userId);
