@@ -6,7 +6,7 @@ async function handleRequest(request, env) {
     const { message, callback_query } = data;
     if (message && message.text === '/start') {
       return await startFlow(message.chat.id, env);
-    } else if (message && message.text && userData.has(message.from.id)) {
+    } else if (message && (message.text || message.contact) && userData.has(message.from.id)) {
       const user = userData.get(message.from.id);
       if (user.state === 'awaiting_name' || user.state === 'awaiting_phone') {
         return await processNameInput(message, env);
