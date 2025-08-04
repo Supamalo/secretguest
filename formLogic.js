@@ -27,18 +27,18 @@ export async function processCallback(callbackQuery, env) {
 
   if (data.startsWith("cafe_")) {
     const cafeKey = data.replace("cafe_", "");
-    // Получаем адреса из KV
-    const addressesRaw = await env[ADDRESSES_KV].get(cafeKey);
-    if (!addressesRaw) {
-      await sendMessage(chatId, "Нет адресов для выбранного заведения.");
+    // Получаем точки из KV
+    const pointsRaw = await env[ADDRESSES_KV].get(cafeKey);
+    if (!pointsRaw) {
+      await sendMessage(chatId, "Нет точек для выбранного заведения.");
       await answerCallback(callbackId);
       return new Response('OK', { status: 200 });
     }
-    const addresses = JSON.parse(addressesRaw);
-    userData.set(userId, { state: "awaiting_address", cafe: cafeKey });
+    const points = JSON.parse(pointsRaw); // [{ name, address }]
+    userData.set(userId, { state: "awaiting_address", cafe: cafeKey, points });
     const keyboard = {
-      inline_keyboard: addresses.map(addr => [
-        { text: addr, callback_data: `address_${addr}` }
+      inline_keyboard: points.map(point => [
+        { text: point.name, callback_data: `address_${point.name}` }
       ])
     };
     await sendMessage(chatId, "Выберите точку:", keyboard);
@@ -47,15 +47,22 @@ export async function processCallback(callbackQuery, env) {
   }
 
   if (data.startsWith("address_")) {
-    const address = data.replace("address_", "");
+    const pointName = data.replace("address_", "");
     const user = userData.get(userId);
     if (!user || user.state !== "awaiting_address") {
       await sendMessage(chatId, "Пожалуйста, начните с /start.");
       await answerCallback(callbackId);
       return new Response('OK', { status: 200 });
     }
-    userData.set(userId, { ...user, address, state: "awaiting_name" });
-    await sendMessage(chatId, "Введите фамилию и имя через пробел:");
+    // Найти адрес по имени точки
+    const point = (user.points || []).find(p => p.name === pointName);
+    if (!point) {
+      await sendMessage(chatId, "Точка не найдена.");
+      await answerCallback(callbackId);
+      return new Response('OK', { status: 200 });
+    }
+    userData.set(userId, { ...user, address: point.address, pointName, state: "awaiting_name" });
+    await sendMessage(chatId, `Адрес точки: ${point.address}\n\nВведите фамилию и имя через пробел:`);
     await answerCallback(callbackId);
     return new Response('OK', { status: 200 });
   }
