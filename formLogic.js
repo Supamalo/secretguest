@@ -37,12 +37,9 @@ export async function processCallback(callbackQuery, env) {
     const points = JSON.parse(pointsRaw); // [{ name, address }]
     userData.set(userId, { state: "awaiting_address", cafe: cafeKey, points });
     const keyboard = {
-      inline_keyboard: [
-        ...points.map(point => [
-          { text: point.name, callback_data: `address_${point.name}` }
-        ]),
-        [{ text: "Вернуться к списку", callback_data: "back_to_cafes" }]
-      ]
+      inline_keyboard: points.map(point => [
+        { text: point.name, callback_data: `address_${point.name}` }
+      ])
     };
     await sendMessage(chatId, "Выберите точку:", keyboard);
     await answerCallback(callbackId);
@@ -65,7 +62,7 @@ export async function processCallback(callbackQuery, env) {
     const pointName = data.replace("address_", "");
     const user = userData.get(userId);
     if (!user || user.state !== "awaiting_address") {
-      await sendMessage(chatId, "Пожалуйста, начните с /start.");
+      await sendMessage(chatId, "С помощью этого бота можно указать, какую точку посетили. Для начала введите /start");
       await answerCallback(callbackId);
       return new Response('OK', { status: 200 });
     }
@@ -77,7 +74,12 @@ export async function processCallback(callbackQuery, env) {
       return new Response('OK', { status: 200 });
     }
     userData.set(userId, { ...user, address: point.address, pointName, state: "awaiting_name" });
-    await sendMessage(chatId, `Адрес точки: ${point.address}\n\nВведите фамилию и имя через пробел:`);
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "Вернуться к списку", callback_data: "back_to_cafes" }]
+      ]
+    };
+    await sendMessage(chatId, `Адрес точки: ${point.address}\n\nВведите фамилию и имя через пробел:`, keyboard);
     await answerCallback(callbackId);
     return new Response('OK', { status: 200 });
   }
@@ -90,7 +92,7 @@ export async function processNameInput(message, env) {
   const { from: { id: userId }, text, chat: { id: chatId } } = message;
   const user = userData.get(userId);
   if (!user) {
-    await sendMessage(chatId, "Пожалуйста, начните с /start.");
+    await sendMessage(chatId, "С помощью этого бота можно указать, какую точку посетили. Для начала введите /start");
     return new Response('OK', { status: 200 });
   }
   if (user.state === "awaiting_name") {
@@ -102,13 +104,13 @@ export async function processNameInput(message, env) {
     const lastName = nameParts[0];
     const firstName = nameParts.slice(1).join(' ');
     userData.set(userId, { ...user, lastName, firstName, state: "awaiting_phone" });
-    await sendMessage(chatId, "Укажите пожалуйста номер телефона для связи (например, +79005215644):");
+    await sendMessage(chatId, "Укажите пожалуйста номер телефона для связи (например, +79XXXXXXXXX):");
     return new Response('OK', { status: 200 });
   }
   if (user.state === "awaiting_phone") {
     const phone = text.trim();
-    if (!/^(\+7\d{10})$/.test(phone)) {
-      await sendMessage(chatId, "Номер должен быть в формате +79001234567.");
+    if (!/^(\+79\d{9})$/.test(phone)) {
+      await sendMessage(chatId, "Номер должен быть в формате +79XXXXXXXXX. Пожалуйста, введите корретный номер:");
       return new Response('OK', { status: 200 });
     }
     const now = new Date();
