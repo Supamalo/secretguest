@@ -126,7 +126,7 @@ export async function processNameInput(message, env) {
       resize_keyboard: true,
       one_time_keyboard: true
     };
-    await sendMessage(chatId, "Укажите пожалуйста номер телефона для связи (например, +79XXXXXXXXX, 8XXXXXXXXXX, 9XXXXXXXXX):", keyboard);
+    await sendMessage(chatId, "Укажите пожалуйста номер телефона для связи (начиная с +7 или 8):", keyboard);
     return new Response('OK', { status: 200 });
   }
   if (user.state === "awaiting_phone") {
@@ -175,7 +175,7 @@ export async function processNameInput(message, env) {
       }
       msg += `\nТелефон: ${phone}\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}`;
       await sendMessage(GROUP_ID, msg);
-      await sendMessage(chatId, "Спасибо! Заявка на дегустацию отправлена, с Вами скоро свяжутся!");
+      await sendMessage(chatId, "Спасибо! Заявка на дегустацию отправлена, с Вами скоро свяжутся");
     } else {
       let msg = `Точка проверена\n\nТайный гость: ${user.lastName} ${user.firstName}`;
       if (message.from.username) {
@@ -183,7 +183,7 @@ export async function processNameInput(message, env) {
       }
       msg += `\nТелефон: ${phone}\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}\nДата: ${dateStr}`;
       await sendMessage(GROUP_ID, msg);
-      await sendMessage(chatId, "Спасибо! Ваши данные отправлены!");
+      await sendMessage(chatId, "Спасибо! Ваши данные отправлены.");
     }
     userData.delete(userId);
     return new Response('OK', { status: 200 });
