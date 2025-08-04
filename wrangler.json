@@ -1,0 +1,9 @@
+{
+  "name": "secretquest",
+  "compatibility_date": "2025-08-04",
+  "main": "main.js",
+  "kv_namespaces": [
+    { "binding": "sq_adresses", "id": "1df4a493ef51498ba7c3a828ec422c02" },
+    { "binding": "sq_checked", "id": "c471ea526eb54f139b8b0be93f6a30ba" }
+  ]
+}
