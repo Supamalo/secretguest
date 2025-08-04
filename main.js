@@ -6,16 +6,13 @@ async function handleRequest(request, env) {
     const { message, callback_query } = data;
     if (message && message.text === '/start') {
       return await startFlow(message.chat.id, env);
-    } else if (message && message.text && userData.has(message.from.id) && userData.get(message.from.id).state === 'awaiting_name') {
-      return await processNameInput(message, env);
-    } else if (callback_query && callback_query.data) {
-      return await processCallback(callback_query, env);
     } else if (message && message.text && userData.has(message.from.id)) {
       const user = userData.get(message.from.id);
       if (user.state === 'awaiting_name' || user.state === 'awaiting_phone') {
-        await processNameInput(message, env);
-        return;
+        return await processNameInput(message, env);
       }
+    } else if (callback_query && callback_query.data) {
+      return await processCallback(callback_query, env);
     }
   }
   return new Response('OK', { status: 200 });
