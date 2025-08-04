@@ -132,28 +132,14 @@ export async function processNameInput(message, env) {
   if (user.state === "awaiting_phone") {
     let phone;
     if (contact && contact.phone_number) {
-      // Телеграм может прислать номер в формате +7 или 7 или 8, иногда без +
       phone = contact.phone_number.replace(/[\s\-()]/g, '');
-      // Если начинается с 7 и длина 11, добавляем +
-      if (/^7\d{10}$/.test(phone)) phone = '+7' + phone.slice(1);
-      // Если начинается с 8 и длина 11, преобразуем в +7
-      if (/^8\d{10}$/.test(phone)) phone = '+7' + phone.slice(1);
-      // Если начинается с +7, оставляем как есть
-      if (!/^(\+7)\d{10}$/.test(phone)) {
-        const keyboard = {
-          keyboard: [
-            [{ text: "Поделиться номером", request_contact: true }]
-          ],
-          resize_keyboard: true,
-          one_time_keyboard: true
-        };
-        await sendMessage(chatId, "Номер должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX.\nПожалуйста, попробуйте еще раз:", keyboard);
-        return new Response('OK', { status: 200 });
-      }
-    } else {
-      phone = text.trim().replace(/[\s\-()]/g, '');
-      if (/^(?:\+7|8)\d{10}$/.test(phone)) {
-        if (phone.startsWith('8')) phone = '+7' + phone.slice(1);
+      // Если начинается с +7 и длина 12, ок
+      if (/^\+7\d{10}$/.test(phone)) {
+        // всё хорошо
+      } else if (/^7\d{10}$/.test(phone)) {
+        phone = '+7' + phone.slice(1);
+      } else if (/^8\d{10}$/.test(phone)) {
+        phone = '+7' + phone.slice(1);
       } else {
         const keyboard = {
           keyboard: [
@@ -165,6 +151,34 @@ export async function processNameInput(message, env) {
         await sendMessage(chatId, "Номер должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX.\nПожалуйста, попробуйте еще раз:", keyboard);
         return new Response('OK', { status: 200 });
       }
+    } else if (typeof text === 'string') {
+      phone = text.trim().replace(/[\s\-()]/g, '');
+      if (/^\+7\d{10}$/.test(phone)) {
+        // всё хорошо
+      } else if (/^8\d{10}$/.test(phone)) {
+        phone = '+7' + phone.slice(1);
+      } else {
+        const keyboard = {
+          keyboard: [
+            [{ text: "Поделиться номером", request_contact: true }]
+          ],
+          resize_keyboard: true,
+          one_time_keyboard: true
+        };
+        await sendMessage(chatId, "Номер должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX.\nПожалуйста, попробуйте еще раз:", keyboard);
+        return new Response('OK', { status: 200 });
+      }
+    } else {
+      // если ни contact, ни text — повторить запрос
+      const keyboard = {
+        keyboard: [
+          [{ text: "Поделиться номером", request_contact: true }]
+        ],
+        resize_keyboard: true,
+        one_time_keyboard: true
+      };
+      await sendMessage(chatId, "Пожалуйста, отправьте номер телефона или поделитесь контактом.", keyboard);
+      return new Response('OK', { status: 200 });
     }
     const now = new Date();
     const dateStr = `${now.getDate().toString().padStart(2, '0')}.${(now.getMonth()+1).toString().padStart(2, '0')}.${now.getFullYear()}`;
@@ -179,13 +193,11 @@ export async function processNameInput(message, env) {
       timestamp: now.toISOString(),
       date: dateStr
     };
-    // Сохраняем в KV
     try {
       await env[RESULTS_KV].put(`${userId}_${Date.now()}`, JSON.stringify(result));
     } catch (e) {
       // ignore
     }
-    // Формируем сообщение для канала
     if (user.mode === "candidate") {
       let msg = `Заявка на проверку\n\nКандидат: ${user.lastName} ${user.firstName}`;
       if (message.from.username) {
