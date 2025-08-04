@@ -135,7 +135,7 @@ export async function processNameInput(message, env) {
     // Формируем сообщение для канала
     let msg = `Точка проверена\n\nТайный гость: ${user.lastName} ${user.firstName}`;
     if (message.from.username) {
-      msg += `\n@${message.from.username}`;
+      msg += `\nUsername: @${message.from.username}`;
     }
     msg += `\nТелефон: ${phone}\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}\nДата: ${dateStr}`;
     await sendMessage(GROUP_ID, msg);
