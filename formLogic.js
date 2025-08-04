@@ -9,6 +9,7 @@ const cafeNames = {
 
 const ADDRESSES_KV = "sq_adresses";
 const RESULTS_KV = "sq_checked";
+const RESUME_KV = "sq-resume";
 const GROUP_ID = "-1002607218317"; // заменить на ваш id
 
 export async function startFlow(chatId, env) {
@@ -194,7 +195,11 @@ export async function processNameInput(message, env) {
       date: dateStr
     };
     try {
-      await env[RESULTS_KV].put(`${userId}_${Date.now()}`, JSON.stringify(result));
+      if (user.mode === "candidate") {
+        await env[RESUME_KV].put(`${userId}_${Date.now()}`, JSON.stringify(result));
+      } else {
+        await env[RESULTS_KV].put(`${userId}_${Date.now()}`, JSON.stringify(result));
+      }
     } catch (e) {
       // ignore
     }
