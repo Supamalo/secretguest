@@ -130,23 +130,41 @@ export async function processNameInput(message, env) {
     return new Response('OK', { status: 200 });
   }
   if (user.state === "awaiting_phone") {
-    let phone = contact?.phone_number || text.trim();
-    phone = phone.replace(/[\s\-()]/g, '');
-    // Только +7XXXXXXXXXX или 8XXXXXXXXXX
-    if (/^(?:\+7|8)\d{10}$/.test(phone)) {
-      // нормализуем к +7XXXXXXXXXX
-      if (phone.startsWith('8')) phone = '+7' + phone.slice(1);
-      // если уже +7, оставляем как есть
+    let phone;
+    if (contact && contact.phone_number) {
+      // Телеграм может прислать номер в формате +7 или 7 или 8, иногда без +
+      phone = contact.phone_number.replace(/[\s\-()]/g, '');
+      // Если начинается с 7 и длина 11, добавляем +
+      if (/^7\d{10}$/.test(phone)) phone = '+7' + phone.slice(1);
+      // Если начинается с 8 и длина 11, преобразуем в +7
+      if (/^8\d{10}$/.test(phone)) phone = '+7' + phone.slice(1);
+      // Если начинается с +7, оставляем как есть
+      if (!/^(\+7)\d{10}$/.test(phone)) {
+        const keyboard = {
+          keyboard: [
+            [{ text: "Поделиться номером", request_contact: true }]
+          ],
+          resize_keyboard: true,
+          one_time_keyboard: true
+        };
+        await sendMessage(chatId, "Номер должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX.\nПожалуйста, попробуйте еще раз:", keyboard);
+        return new Response('OK', { status: 200 });
+      }
     } else {
-      const keyboard = {
-        keyboard: [
-          [{ text: "Поделиться номером", request_contact: true }]
-        ],
-        resize_keyboard: true,
-        one_time_keyboard: true
-      };
-      await sendMessage(chatId, "Номер должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX.\nПожалуйста, попробуйте еще раз:", keyboard);
-      return new Response('OK', { status: 200 });
+      phone = text.trim().replace(/[\s\-()]/g, '');
+      if (/^(?:\+7|8)\d{10}$/.test(phone)) {
+        if (phone.startsWith('8')) phone = '+7' + phone.slice(1);
+      } else {
+        const keyboard = {
+          keyboard: [
+            [{ text: "Поделиться номером", request_contact: true }]
+          ],
+          resize_keyboard: true,
+          one_time_keyboard: true
+        };
+        await sendMessage(chatId, "Номер должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX.\nПожалуйста, попробуйте еще раз:", keyboard);
+        return new Response('OK', { status: 200 });
+      }
     }
     const now = new Date();
     const dateStr = `${now.getDate().toString().padStart(2, '0')}.${(now.getMonth()+1).toString().padStart(2, '0')}.${now.getFullYear()}`;
