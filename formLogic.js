@@ -103,9 +103,10 @@ export async function processNameInput(message, env) {
     // ignore
   }
   // Отправляем в канал
-  const msg = `Новая заявка:\n${lastName} ${firstName}\n${cafeNames[user.cafe]}\n${user.address}`;
+  const msg = `Точка проверена:\n${lastName} ${firstName}\n${cafeNames[user.cafe]}\n${user.address}`;
   await sendMessage(GROUP_ID, msg);
   await sendMessage(chatId, "Спасибо! Ваши данные отправлены.");
   userData.delete(userId);
   return new Response('OK', { status: 200 });
 }
+
