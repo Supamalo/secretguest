@@ -110,7 +110,7 @@ export async function processNameInput(message, env) {
   if (user.state === "awaiting_phone") {
     const phone = text.trim();
     if (!/^(\+79\d{9})$/.test(phone)) {
-      await sendMessage(chatId, "Номер должен быть в формате +79XXXXXXXXX. Пожалуйста, введите корретный номер:");
+      await sendMessage(chatId, "Номер должен быть в формате +79XXXXXXXXX.\nПожалуйста, попробуйте еще раз:");
       return new Response('OK', { status: 200 });
     }
     const now = new Date();
