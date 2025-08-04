@@ -37,11 +37,26 @@ export async function processCallback(callbackQuery, env) {
     const points = JSON.parse(pointsRaw); // [{ name, address }]
     userData.set(userId, { state: "awaiting_address", cafe: cafeKey, points });
     const keyboard = {
-      inline_keyboard: points.map(point => [
-        { text: point.name, callback_data: `address_${point.name}` }
-      ])
+      inline_keyboard: [
+        ...points.map(point => [
+          { text: point.name, callback_data: `address_${point.name}` }
+        ]),
+        [{ text: "Вернуться к списку", callback_data: "back_to_cafes" }]
+      ]
     };
     await sendMessage(chatId, "Выберите точку:", keyboard);
+    await answerCallback(callbackId);
+    return new Response('OK', { status: 200 });
+  }
+
+  if (data === "back_to_cafes") {
+    userData.set(userId, {}); // сбрасываем выбор точки
+    const keyboard = {
+      inline_keyboard: Object.entries(cafeNames).map(([key, name]) => [
+        { text: name, callback_data: `cafe_${key}` }
+      ])
+    };
+    await sendMessage(chatId, "Выберите заведение:", keyboard);
     await answerCallback(callbackId);
     return new Response('OK', { status: 200 });
   }
@@ -74,40 +89,54 @@ export async function processCallback(callbackQuery, env) {
 export async function processNameInput(message, env) {
   const { from: { id: userId }, text, chat: { id: chatId } } = message;
   const user = userData.get(userId);
-  if (!user || user.state !== "awaiting_name") {
+  if (!user) {
     await sendMessage(chatId, "Пожалуйста, начните с /start.");
     return new Response('OK', { status: 200 });
   }
-  const nameParts = text.trim().split(/\s+/);
-  if (nameParts.length < 2) {
-    await sendMessage(chatId, "Пожалуйста, укажите фамилию и имя через пробел.");
+  if (user.state === "awaiting_name") {
+    const nameParts = text.trim().split(/\s+/);
+    if (nameParts.length < 2) {
+      await sendMessage(chatId, "Пожалуйста, укажите фамилию и имя через пробел.");
+      return new Response('OK', { status: 200 });
+    }
+    const lastName = nameParts[0];
+    const firstName = nameParts.slice(1).join(' ');
+    userData.set(userId, { ...user, lastName, firstName, state: "awaiting_phone" });
+    await sendMessage(chatId, "Укажите пожалуйста номер телефона для связи (например, +79005215644):");
     return new Response('OK', { status: 200 });
   }
-  const lastName = nameParts[0];
-  const firstName = nameParts.slice(1).join(' ');
-  const now = new Date();
-  const result = {
-    telegramId: userId,
-    username: message.from.username || '',
-    firstName,
-    lastName,
-    cafe: cafeNames[user.cafe],
-    address: user.address,
-    timestamp: now.toISOString(),
-    date: `${now.getDate().toString().padStart(2, '0')}.${(now.getMonth()+1).toString().padStart(2, '0')}.${now.getFullYear()}`
-  };
-  // Сохраняем в KV
-  try {
-    await env[RESULTS_KV].put(`${userId}_${Date.now()}`, JSON.stringify(result));
-  } catch (e) {
-    // ignore
+  if (user.state === "awaiting_phone") {
+    const phone = text.trim();
+    if (!/^(\+7\d{10})$/.test(phone)) {
+      await sendMessage(chatId, "Номер должен быть в формате +79001234567.");
+      return new Response('OK', { status: 200 });
+    }
+    const now = new Date();
+    const result = {
+      telegramId: userId,
+      username: message.from.username || '',
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone,
+      cafe: cafeNames[user.cafe],
+      address: user.address,
+      timestamp: now.toISOString(),
+      date: `${now.getDate().toString().padStart(2, '0')}.${(now.getMonth()+1).toString().padStart(2, '0')}.${now.getFullYear()}`
+    };
+    // Сохраняем в KV
+    try {
+      await env[RESULTS_KV].put(`${userId}_${Date.now()}`, JSON.stringify(result));
+    } catch (e) {
+      // ignore
+    }
+    // Отправляем в канал
+    const msg = `Точка проверена\n\nТайный гость: ${user.lastName} ${user.firstName}\nТелефон: ${phone}\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}`;
+    await sendMessage(GROUP_ID, msg);
+    await sendMessage(chatId, "Спасибо! Ваши данные отправлены.");
+    userData.delete(userId);
+    return new Response('OK', { status: 200 });
   }
-  // Отправляем в канал
-  const msg = `Точка проверена\n\nТайный гость: ${lastName} ${firstName}\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}`;
-  await sendMessage(GROUP_ID, msg);
-  await sendMessage(chatId, "Спасибо! Ваши данные отправлены.");
-  userData.delete(userId);
-  return new Response('OK', { status: 200 });
+  // ...existing code...
 }
 
 
