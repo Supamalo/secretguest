@@ -13,11 +13,12 @@ const GROUP_ID = "-1002607218317"; // заменить на ваш id
 
 export async function startFlow(chatId, env) {
   const keyboard = {
-    inline_keyboard: Object.entries(cafeNames).map(([key, name]) => [
-      { text: name, callback_data: `cafe_${key}` }
-    ])
+    inline_keyboard: [
+      [{ text: "Хочу быть дегустатором", callback_data: "mode_candidate" }],
+      [{ text: "Уже дегустатор", callback_data: "mode_guest" }]
+    ]
   };
-  await sendMessage(chatId, "Выберите заведение:", keyboard);
+  await sendMessage(chatId, "Выберите действие:", keyboard);
   return new Response('OK', { status: 200 });
 }
 
@@ -25,17 +26,30 @@ export async function processCallback(callbackQuery, env) {
   const { id: callbackId, from: { id: userId }, data, message } = callbackQuery;
   const chatId = message.chat.id;
 
+  if (data === "mode_candidate" || data === "mode_guest") {
+    userData.set(userId, { mode: data === "mode_candidate" ? "candidate" : "guest" });
+    const keyboard = {
+      inline_keyboard: Object.entries(cafeNames).map(([key, name]) => [
+        { text: name, callback_data: `cafe_${key}` }
+      ])
+    };
+    await sendMessage(chatId, "Выберите сеть заведений:", keyboard);
+    await answerCallback(callbackId);
+    return new Response('OK', { status: 200 });
+  }
+
   if (data.startsWith("cafe_")) {
     const cafeKey = data.replace("cafe_", "");
     // Получаем точки из KV
     const pointsRaw = await env[ADDRESSES_KV].get(cafeKey);
     if (!pointsRaw) {
-      await sendMessage(chatId, "Нет точек для выбранного заведения.");
+      await sendMessage(chatId, "Нет точек для выбранной сети.");
       await answerCallback(callbackId);
       return new Response('OK', { status: 200 });
     }
     const points = JSON.parse(pointsRaw); // [{ name, address }]
-    userData.set(userId, { state: "awaiting_address", cafe: cafeKey, points });
+    const user = userData.get(userId) || {};
+    userData.set(userId, { ...user, state: "awaiting_address", cafe: cafeKey, points });
     const keyboard = {
       inline_keyboard: points.map(point => [
         { text: point.name, callback_data: `address_${point.name}` }
@@ -47,7 +61,8 @@ export async function processCallback(callbackQuery, env) {
   }
 
   if (data === "back_to_cafes") {
-    userData.set(userId, {}); // сбрасываем выбор точки
+    const user = userData.get(userId) || {};
+    userData.set(userId, { mode: user.mode }); // сохраняем режим
     const keyboard = {
       inline_keyboard: Object.entries(cafeNames).map(([key, name]) => [
         { text: name, callback_data: `cafe_${key}` }
@@ -62,7 +77,7 @@ export async function processCallback(callbackQuery, env) {
     const pointName = data.replace("address_", "");
     const user = userData.get(userId);
     if (!user || user.state !== "awaiting_address") {
-      await sendMessage(chatId, "С помощью этого бота можно указать, какую точку посетили. Для начала введите /start");
+      await sendMessage(chatId, "Бот предназначен для тайных дегустаторов. Для начала введите /start");
       await answerCallback(callbackId);
       return new Response('OK', { status: 200 });
     }
@@ -133,13 +148,23 @@ export async function processNameInput(message, env) {
       // ignore
     }
     // Формируем сообщение для канала
-    let msg = `Точка проверена\n\nТайный гость: ${user.lastName} ${user.firstName}`;
-    if (message.from.username) {
-      msg += `\nUsername: @${message.from.username}`;
+    if (user.mode === "candidate") {
+      let msg = `Заявка на проверку\n\nКандидат: ${user.lastName} ${user.firstName}`;
+      if (message.from.username) {
+        msg += `\nUsername: @${message.from.username}`;
+      }
+      msg += `\nТелефон: ${phone}\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}`;
+      await sendMessage(GROUP_ID, msg);
+      await sendMessage(chatId, "Спасибо! Заявка на дегустацию отправлена, с Вами скоро свяжутся");
+    } else {
+      let msg = `Точка проверена\n\nТайный гость: ${user.lastName} ${user.firstName}`;
+      if (message.from.username) {
+        msg += `\nUsername: @${message.from.username}`;
+      }
+      msg += `\nТелефон: ${phone}\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}\nДата: ${dateStr}`;
+      await sendMessage(GROUP_ID, msg);
+      await sendMessage(chatId, "Спасибо! Ваши данные отправлены.");
     }
-    msg += `\nТелефон: ${phone}\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}\nДата: ${dateStr}`;
-    await sendMessage(GROUP_ID, msg);
-    await sendMessage(chatId, "Спасибо! Ваши данные отправлены.");
     userData.delete(userId);
     return new Response('OK', { status: 200 });
   }
