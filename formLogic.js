@@ -77,7 +77,7 @@ export async function processCallback(callbackQuery, env) {
     const pointName = data.replace("address_", "");
     const user = userData.get(userId);
     if (!user || user.state !== "awaiting_address") {
-      await sendMessage(chatId, "Бот предназначен для тайных дегустаторов. Для начала введите /start");
+      await sendMessage(chatId, "Бот предназначен для тайных дегустаторов. \n\nДля начала введите /start");
       await answerCallback(callbackId);
       return new Response('OK', { status: 200 });
     }
@@ -107,7 +107,7 @@ export async function processNameInput(message, env) {
   const { from: { id: userId }, text, chat: { id: chatId } } = message;
   const user = userData.get(userId);
   if (!user) {
-    await sendMessage(chatId, "С помощью этого бота можно указать, какую точку посетили. Для начала введите /start");
+    await sendMessage(chatId, "Бот предназначен для тайных дегустаторов. \n\nДля начала введите /start");
     return new Response('OK', { status: 200 });
   }
   if (user.state === "awaiting_name") {
@@ -149,11 +149,11 @@ export async function processNameInput(message, env) {
     }
     // Формируем сообщение для канала
     if (user.mode === "candidate") {
-      let msg = `Заявка на проверку\n\nКандидат: ${user.lastName} ${user.firstName}`;
+      let msg = `Заявка на дегустатора\n\nКандидат: ${user.lastName} ${user.firstName}`;
       if (message.from.username) {
         msg += `\nUsername: @${message.from.username}`;
       }
-      msg += `\nТелефон: ${phone}\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}`;
+      msg += `\n\nТелефон: ${phone}\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}`;
       await sendMessage(GROUP_ID, msg);
       await sendMessage(chatId, "Спасибо! Заявка на дегустацию отправлена, с Вами скоро свяжутся");
     } else {
@@ -170,6 +170,7 @@ export async function processNameInput(message, env) {
   }
   // ...existing code...
 }
+
 
 
 
