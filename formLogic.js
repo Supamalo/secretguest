@@ -53,7 +53,8 @@ export async function processCallback(callbackQuery, env) {
     userData.set(userId, { ...user, state: "awaiting_address", cafe: cafeKey, points });
     const keyboard = {
       inline_keyboard: points.map(point => [
-        { text: point.name, callback_data: `address_${point.name}` }
+        //{ text: point.name, callback_data: `address_${point.name}` }
+        { text: point.address, callback_data: `address_${point.name}` }
       ])
     };
     await sendMessage(chatId, "Выберите точку:", keyboard);
@@ -83,7 +84,7 @@ export async function processCallback(callbackQuery, env) {
       return new Response('OK', { status: 200 });
     }
     // Найти адрес по имени точки
-    const point = (user.points || []).find(p => p.name === pointName);
+    const point = (user.points || []).find(p => p.address === pointName);
     if (!point) {
       await sendMessage(chatId, "Точка не найдена.");
       await answerCallback(callbackId);
@@ -225,6 +226,7 @@ export async function processNameInput(message, env) {
   }
   // ...existing code...
 }
+
 
 
 
