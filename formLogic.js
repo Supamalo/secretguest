@@ -16,7 +16,7 @@ export async function startFlow(chatId, env) {
   const keyboard = {
     inline_keyboard: [
       [{ text: "Хочу быть дегустатором", callback_data: "mode_candidate" }],
-      [{ text: "Уже дегустатор", callback_data: "mode_guest" }]
+     // [{ text: "Уже дегустатор", callback_data: "mode_guest" }]
     ]
   };
   await sendMessage(chatId, "Выберите действие:", keyboard);
@@ -225,6 +225,7 @@ export async function processNameInput(message, env) {
   }
   // ...existing code...
 }
+
 
 
 
