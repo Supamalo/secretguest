@@ -2,8 +2,8 @@ import { sendMessage, answerCallback } from './telegramApi.js';
 import { userData } from './main.js';
 
 const cafeNames = {
-  croissant: "Круассан кафе",
-  porto: "Порто кофе",
+  // croissant: "Круассан кафе", // скрыто по просьбе
+  // porto: "Порто кофе",        // скрыто по просьбе
   kenigs: "Кенигсбеккер"
 };
 
@@ -53,7 +53,6 @@ export async function processCallback(callbackQuery, env) {
     userData.set(userId, { ...user, state: "awaiting_address", cafe: cafeKey, points });
     const keyboard = {
       inline_keyboard: points.map(point => [
-        //{ text: point.name, callback_data: `address_${point.name}` }
         { text: point.address, callback_data: `address_${point.name}` }
       ])
     };
@@ -84,7 +83,7 @@ export async function processCallback(callbackQuery, env) {
       return new Response('OK', { status: 200 });
     }
     // Найти адрес по имени точки
-    const point = (user.points || []).find(p => p.address === pointName);
+    const point = (user.points || []).find(p => p.name === pointName);
     if (!point) {
       await sendMessage(chatId, "Точка не найдена.");
       await answerCallback(callbackId);
@@ -226,8 +225,6 @@ export async function processNameInput(message, env) {
   }
   // ...existing code...
 }
-
-
 
 
 
