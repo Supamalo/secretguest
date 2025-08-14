@@ -150,25 +150,26 @@ export async function processCallback(callbackQuery, env) {
     return new Response('OK', { status: 200 });
   }
 
-  if (data.startsWith("adjust_address_")) {
-    const pointName = data.replace("adjust_address_", "");
-    const user = userData.get(userId);
-    if (!user || user.state !== "awaiting_adjust_address" || !ADMIN_IDS.includes(userId.toString())) {
-      await sendMessage(chatId, "У вас нет прав для этой операции.");
-      await answerCallback(callbackId);
-      return new Response('OK', { status: 200 });
-    }
-    const point = user.points.find(p => p.name === pointName);
-    if (!point) {
-      await sendMessage(chatId, "Точка не найдена.");
-      await answerCallback(callbackId);
-      return new Response('OK', { status: 200 });
-    }
-    userData.set(userId, { ...user, pointName, address: point.address, state: "awaiting_adjust_slots" });
-    await sendMessage(chatId, `Текущее количество мест: ${point.slots || 0}\n\nВведите количество мест:`);
+if (data.startsWith("adjust_address_")) {
+  const pointName = data.replace("adjust_address_", "");
+  const user = userData.get(userId);
+  if (!user || user.state !== "awaiting_adjust_address" || !ADMIN_IDS.includes(userId.toString())) {
+    await sendMessage(chatId, "У вас нет прав для этой операции.");
     await answerCallback(callbackId);
     return new Response('OK', { status: 200 });
   }
+  const point = user.points.find(p => p.name === pointName);
+  if (!point) {
+    await sendMessage(chatId, "Точка не найдена.");
+    await answerCallback(callbackId);
+    return new Response('OK', { status: 200 });
+  }
+  await sendMessage(chatId, "Debug: Point found " + JSON.stringify(point)); // Отладка
+  userData.set(userId, { ...user, pointName, address: point.address, state: "awaiting_adjust_slots" });
+  await sendMessage(chatId, `Текущее количество мест: ${point.slots || 0}\n\nВведите количество мест:`);
+  await answerCallback(callbackId);
+  return new Response('OK', { status: 200 });
+}
 
   await answerCallback(callbackId);
   return new Response('OK', { status: 200 });
