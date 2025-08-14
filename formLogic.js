@@ -11,6 +11,7 @@ const ADDRESSES_KV = "sq_adresses";
 const RESULTS_KV = "sq_checked";
 const RESUME_KV = "sq-resume";
 const GROUP_ID = "-1002607218317"; // заменить на ваш id
+const ADMIN_IDS = [642127857]; // Список ID администраторов
 
 export async function startFlow(chatId, env) {
   const keyboard = {
@@ -165,6 +166,13 @@ export async function processCallback(callbackQuery, env) {
 
 export async function processNameInput(message, env) {
   const { from: { id: userId }, text, chat: { id: chatId }, contact } = message;
+
+  // Обработка команды /start
+  if (text === '/start') {
+    userData.delete(userId); // Сбрасываем состояние пользователя
+    return startFlow(chatId, env);
+  }
+
   const user = userData.get(userId);
   if (!user) {
     await sendMessage(chatId, "Бот предназначен для тайных дегустаторов.\n\nДля начала введите /start");
