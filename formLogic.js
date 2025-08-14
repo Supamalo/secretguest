@@ -7,16 +7,11 @@ const cafeNames = {
   kenigs: "Кенигсбеккер"
 };
 
-const ADDRESSES_KV = "sq_adresses";
-const RESULTS_KV = "sq_checked";
-const RESUME_KV = "sq-resume";
-const GROUP_ID = "-1002607218317"; // заменить на ваш id
-
 export async function startFlow(chatId, env) {
   const keyboard = {
     inline_keyboard: [
       [{ text: "Хочу быть дегустатором", callback_data: "mode_candidate" }],
-     // [{ text: "Уже дегустатор", callback_data: "mode_guest" }]
+      ...(ADMIN_IDS.includes(chatId) ? [[{ text: "Скорректировать места", callback_data: "mode_adjust_slots" }]] : [])
     ]
   };
   await sendMessage(chatId, "Выберите действие:", keyboard);
@@ -39,17 +34,27 @@ export async function processCallback(callbackQuery, env) {
     return new Response('OK', { status: 200 });
   }
 
-  if (data.startsWith("cafe_")) {
+  if (data === "mode_adjust_slots" && ADMIN_IDS.includes(userId)) {
+    userData.set(userId, { mode: "adjust_slots" });
+    const keyboard = {
+      inline_keyboard: Object.entries(cafeNames).map(([key, name]) => [
+        { text: name, callback_data: `cafe_adjust_${key}` }
+      ])
+    };
+    await sendMessage(chatId, "Выберите сеть заведений для корректировки мест:", keyboard);
+    await answerCallback(callbackId);
+    return new Response('OK', { status: 200 });
+  }
+
+  if (data.startsWith("cafe_") && !data.startsWith("cafe_adjust_")) {
     const cafeKey = data.replace("cafe_", "");
-    // Получаем точки из KV
     const pointsRaw = await env[ADDRESSES_KV].get(cafeKey);
     if (!pointsRaw) {
       await sendMessage(chatId, "Нет точек для выбранной сети.");
       await answerCallback(callbackId);
       return new Response('OK', { status: 200 });
     }
-    const points = JSON.parse(pointsRaw); // [{ name, address, slots }]
-    // Фильтруем только свободные точки
+    const points = JSON.parse(pointsRaw);
     const availablePoints = points.filter(point => (point.slots || 0) > 0);
     if (availablePoints.length === 0) {
       await sendMessage(chatId, "Нет точек для регистрации, попробуйте позже.");
@@ -68,9 +73,30 @@ export async function processCallback(callbackQuery, env) {
     return new Response('OK', { status: 200 });
   }
 
+  if (data.startsWith("cafe_adjust_")) {
+    const cafeKey = data.replace("cafe_adjust_", "");
+    const pointsRaw = await env[ADDRESSES_KV].get(cafeKey);
+    if (!pointsRaw) {
+      await sendMessage(chatId, "Нет точек для выбранной сети.");
+      await answerCallback(callbackId);
+      return new Response('OK', { status: 200 });
+    }
+    const points = JSON.parse(pointsRaw);
+    const user = userData.get(userId) || {};
+    userData.set(userId, { ...user, state: "awaiting_adjust_address", cafe: cafeKey, points });
+    const keyboard = {
+      inline_keyboard: points.map(point => [
+        { text: point.address, callback_data: `adjust_address_${point.name}` }
+      ])
+    };
+    await sendMessage(chatId, "Выберите точку для корректировки мест:", keyboard);
+    await answerCallback(callbackId);
+    return new Response('OK', { status: 200 });
+  }
+
   if (data === "back_to_cafes") {
     const user = userData.get(userId) || {};
-    userData.set(userId, { mode: user.mode }); // сохраняем режим
+    userData.set(userId, { mode: user.mode });
     const keyboard = {
       inline_keyboard: Object.entries(cafeNames).map(([key, name]) => [
         { text: name, callback_data: `cafe_${key}` }
@@ -89,7 +115,6 @@ export async function processCallback(callbackQuery, env) {
       await answerCallback(callbackId);
       return new Response('OK', { status: 200 });
     }
-    // Перепроверяем доступность точки
     const pointsRaw = await env[ADDRESSES_KV].get(user.cafe);
     const points = JSON.parse(pointsRaw);
     const point = points.find(p => p.name === pointName);
@@ -105,6 +130,26 @@ export async function processCallback(callbackQuery, env) {
       ]
     };
     await sendMessage(chatId, `Адрес точки: ${point.address}\n\nВведите фамилию и имя через пробел:`, keyboard);
+    await answerCallback(callbackId);
+    return new Response('OK', { status: 200 });
+  }
+
+  if (data.startsWith("adjust_address_")) {
+    const pointName = data.replace("adjust_address_", "");
+    const user = userData.get(userId);
+    if (!user || user.state !== "awaiting_adjust_address" || !ADMIN_IDS.includes(userId)) {
+      await sendMessage(chatId, "У вас нет прав для этой операции.");
+      await answerCallback(callbackId);
+      return new Response('OK', { status: 200 });
+    }
+    const point = user.points.find(p => p.name === pointName);
+    if (!point) {
+      await sendMessage(chatId, "Точка не найдена.");
+      await answerCallback(callbackId);
+      return new Response('OK', { status: 200 });
+    }
+    userData.set(userId, { ...user, pointName, address: point.address, state: "awaiting_adjust_slots" });
+    await sendMessage(chatId, `Текущее количество мест: ${point.slots}\n\nВведите количество мест:`);
     await answerCallback(callbackId);
     return new Response('OK', { status: 200 });
   }
@@ -143,9 +188,7 @@ export async function processNameInput(message, env) {
     let phone;
     if (contact && contact.phone_number) {
       phone = contact.phone_number.replace(/[\s\-()]/g, '');
-      // Если начинается с +7 и длина 12, ок
       if (/^\+7\d{10}$/.test(phone)) {
-        // всё хорошо
       } else if (/^7\d{10}$/.test(phone)) {
         phone = '+7' + phone.slice(1);
       } else if (/^8\d{10}$/.test(phone)) {
@@ -164,7 +207,6 @@ export async function processNameInput(message, env) {
     } else if (typeof text === 'string') {
       phone = text.trim().replace(/[\s\-()]/g, '');
       if (/^\+7\d{10}$/.test(phone)) {
-        // всё хорошо
       } else if (/^8\d{10}$/.test(phone)) {
         phone = '+7' + phone.slice(1);
       } else {
@@ -179,7 +221,6 @@ export async function processNameInput(message, env) {
         return new Response('OK', { status: 200 });
       }
     } else {
-      // если ни contact, ни text — повторить запрос
       const keyboard = {
         keyboard: [
           [{ text: "Поделиться номером", request_contact: true }]
@@ -205,7 +246,6 @@ export async function processNameInput(message, env) {
     };
     try {
       if (user.mode === "candidate") {
-        // Перепроверяем и обновляем слоты
         const pointsRaw = await env[ADDRESSES_KV].get(user.cafe);
         let points = JSON.parse(pointsRaw);
         const point = points.find(p => p.name === user.pointName);
@@ -243,5 +283,23 @@ export async function processNameInput(message, env) {
     userData.delete(userId);
     return new Response('OK', { status: 200 });
   }
-  // ...existing code...
+  if (user.state === "awaiting_adjust_slots" && ADMIN_IDS.includes(userId)) {
+    const delta = parseInt(text, 10);
+    if (isNaN(delta)) {
+      await sendMessage(chatId, "Пожалуйста, введите корректное число.");
+      return new Response('OK', { status: 200 });
+    }
+    const pointsRaw = await env[ADDRESSES_KV].get(user.cafe);
+    let points = JSON.parse(pointsRaw);
+    const point = points.find(p => p.name === user.pointName);
+    if (point) {
+      point.slots += delta; // Разрешаем отрицательные и положительные значения
+      await env[ADDRESSES_KV].put(user.cafe, JSON.stringify(points));
+      await sendMessage(chatId, "Спасибо, места скорректированы");
+      await sendMessage(GROUP_ID, `Скорректированы места\n\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}\nТекущее количество мест: ${point.slots}`);
+    }
+    userData.delete(userId);
+    return new Response('OK', { status: 200 });
+  }
+  return new Response('OK', { status: 200 });
 }
