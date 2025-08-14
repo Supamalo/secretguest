@@ -14,10 +14,6 @@ id = "c471ea526eb54f139b8b0be93f6a30ba"
 binding = "sq-resume"
 id = "54797a170ca3405b90972873792ebdcf"
 
-[[kv_namespaces]]
-binding = "sq_slots"
-id = "12a1fc1581154917b5e95cf91195cb29"
-
 [logs]
 level = "info"
 enabled = true
