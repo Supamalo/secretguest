@@ -6,6 +6,7 @@ const cafeNames = {
   // porto: "Порто кофе",        // скрыто по просьбе
   kenigs: "Кенигсбеккер"
 };
+
 const ADDRESSES_KV = "sq_adresses";
 const RESULTS_KV = "sq_checked";
 const RESUME_KV = "sq-resume";
@@ -164,7 +165,7 @@ export async function processCallback(callbackQuery, env) {
       return new Response('OK', { status: 200 });
     }
     userData.set(userId, { ...user, pointName, address: point.address, state: "awaiting_adjust_slots" });
-    await sendMessage(chatId, `Текущее количество мест: ${point.slots || 0}\n\nВведите количество мест для добавления:`);
+    await sendMessage(chatId, `Текущее количество мест: ${point.slots || 0}\n\nВведите количество мест:`);
     await answerCallback(callbackId);
     return new Response('OK', { status: 200 });
   }
@@ -193,44 +194,65 @@ export async function processNameInput(message, env) {
       await sendMessage(chatId, "Пожалуйста, укажите фамилию и имя через пробел.");
       return new Response('OK', { status: 200 });
     }
-    const [lastName, ...firstNameParts] = nameParts;
-    const firstName = firstNameParts.join(' ');
+    const lastName = nameParts[0];
+    const firstName = nameParts.slice(1).join(' ');
     userData.set(userId, { ...user, lastName, firstName, state: "awaiting_phone" });
     const keyboard = {
-      keyboard: [[{ text: "Поделиться номером", request_contact: true }]],
+      keyboard: [
+        [{ text: "Поделиться номером", request_contact: true }]
+      ],
       resize_keyboard: true,
       one_time_keyboard: true
     };
-    await sendMessage(chatId, "Укажите номер телефона (начиная с +7 или 8):", keyboard);
+    await sendMessage(chatId, "Укажите пожалуйста номер телефона для связи (начиная с +7 или 8):", keyboard);
     return new Response('OK', { status: 200 });
   }
 
   if (user.state === "awaiting_phone") {
-    let phone = '';
-    if (contact?.phone_number) {
+    let phone;
+    if (contact && contact.phone_number) {
       phone = contact.phone_number.replace(/[\s\-()]/g, '');
-      if (!(/^\+7\d{10}$/.test(phone) || /^7\d{10}$/.test(phone) || /^8\d{10}$/.test(phone))) {
-        phone = '';
+      if (/^\+7\d{10}$/.test(phone)) {
       } else if (/^7\d{10}$/.test(phone)) {
         phone = '+7' + phone.slice(1);
       } else if (/^8\d{10}$/.test(phone)) {
         phone = '+7' + phone.slice(1);
+      } else {
+        const keyboard = {
+          keyboard: [
+            [{ text: "Поделиться номером", request_contact: true }]
+          ],
+          resize_keyboard: true,
+          one_time_keyboard: true
+        };
+        await sendMessage(chatId, "Номер должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX.\nПожалуйста, попробуйте еще раз:", keyboard);
+        return new Response('OK', { status: 200 });
       }
     } else if (typeof text === 'string') {
       phone = text.trim().replace(/[\s\-()]/g, '');
-      if (!(/^\+7\d{10}$/.test(phone) || /^8\d{10}$/.test(phone))) {
-        phone = '';
+      if (/^\+7\d{10}$/.test(phone)) {
       } else if (/^8\d{10}$/.test(phone)) {
         phone = '+7' + phone.slice(1);
+      } else {
+        const keyboard = {
+          keyboard: [
+            [{ text: "Поделиться номером", request_contact: true }]
+          ],
+          resize_keyboard: true,
+          one_time_keyboard: true
+        };
+        await sendMessage(chatId, "Номер должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX.\nПожалуйста, попробуйте еще раз:", keyboard);
+        return new Response('OK', { status: 200 });
       }
-    }
-    if (!phone) {
+    } else {
       const keyboard = {
-        keyboard: [[{ text: "Поделиться номером", request_contact: true }]],
+        keyboard: [
+          [{ text: "Поделиться номером", request_contact: true }]
+        ],
         resize_keyboard: true,
         one_time_keyboard: true
       };
-      await sendMessage(chatId, "Номер должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX. Попробуйте еще раз:", keyboard);
+      await sendMessage(chatId, "Пожалуйста, отправьте номер телефона или поделитесь контактом.", keyboard);
       return new Response('OK', { status: 200 });
     }
     const now = new Date();
@@ -257,7 +279,7 @@ export async function processNameInput(message, env) {
             await env[ADDRESSES_KV].put(user.cafe, JSON.stringify(points));
             await env[RESUME_KV].put(`${userId}_${Date.now()}`, JSON.stringify(result));
           } else {
-            await sendMessage(chatId, "Эта точка уже недоступна.");
+            await sendMessage(chatId, "Ошибка: эта точка уже недоступна.");
             return new Response('OK', { status: 200 });
           }
         }
@@ -267,11 +289,23 @@ export async function processNameInput(message, env) {
     } catch (e) {
       // ignore
     }
-    const msg = user.mode === "candidate"
-      ? `Заявка на проверку\n\nКандидат: ${user.lastName} ${user.firstName}${message.from.username ? `\nUsername: @${message.from.username}` : ''}\nТелефон: ${phone}\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}`
-      : `Точка проверена\n\nТайный гость: ${user.lastName} ${user.firstName}${message.from.username ? `\nUsername: @${message.from.username}` : ''}\nТелефон: ${phone}\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}\nДата: ${dateStr}`;
-    await sendMessage(GROUP_ID, msg);
-    await sendMessage(chatId, user.mode === "candidate" ? "Заявка на дегустацию отправлена, с Вами скоро свяжутся" : "Ваши данные отправлены.");
+    if (user.mode === "candidate") {
+      let msg = `Заявка на проверку\n\nКандидат: ${user.lastName} ${user.firstName}`;
+      if (message.from.username) {
+        msg += `\nUsername: @${message.from.username}`;
+      }
+      msg += `\nТелефон: ${phone}\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}`;
+      await sendMessage(GROUP_ID, msg);
+      await sendMessage(chatId, "Спасибо! Заявка на дегустацию отправлена, с Вами скоро свяжутся");
+    } else {
+      let msg = `Точка проверена\n\nТайный гость: ${user.lastName} ${user.firstName}`;
+      if (message.from.username) {
+        msg += `\nUsername: @${message.from.username}`;
+      }
+      msg += `\nТелефон: ${phone}\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}\nДата: ${dateStr}`;
+      await sendMessage(GROUP_ID, msg);
+      await sendMessage(chatId, "Спасибо! Ваши данные отправлены.");
+    }
     userData.delete(userId);
     return new Response('OK', { status: 200 });
   }
