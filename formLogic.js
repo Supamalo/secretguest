@@ -7,6 +7,11 @@ const cafeNames = {
   kenigs: "Кенигсбеккер"
 };
 
+const ADDRESSES_KV = "sq_adresses";
+const RESULTS_KV = "sq_checked";
+const RESUME_KV = "sq-resume";
+const GROUP_ID = "-1002607218317"; // заменить на ваш id
+
 export async function startFlow(chatId, env) {
   const keyboard = {
     inline_keyboard: [
