@@ -41,7 +41,7 @@ export async function processCallback(callbackQuery, env) {
   }
 
   if (data === "mode_adjust_slots" && ADMIN_IDS.includes(userId.toString())) {
-    userData.set(userId, { mode: "adjust_slots", isAdmin: true }); // Устанавливаем флаг isAdmin
+    userData.set(userId, { mode: "adjust_slots", isAdmin: true });
     const keyboard = {
       inline_keyboard: Object.entries(cafeNames).map(([key, name]) => [
         { text: name, callback_data: `cafe_adjust_${key}` }
@@ -94,7 +94,7 @@ export async function processCallback(callbackQuery, env) {
       await answerCallback(callbackId);
       return new Response('OK', { status: 200 });
     }
-    userData.set(userId, { state: "awaiting_adjust_address", cafe: cafeKey, points, isAdmin: true }); // Сохраняем isAdmin
+    userData.set(userId, { state: "awaiting_adjust_address", cafe: cafeKey, points, isAdmin: true });
     const keyboard = {
       inline_keyboard: points.map(point => [
         { text: point.address, callback_data: `adjust_address_${point.name}` }
@@ -153,7 +153,7 @@ export async function processCallback(callbackQuery, env) {
   if (data.startsWith("adjust_address_")) {
     const pointName = data.replace("adjust_address_", "");
     const user = userData.get(userId);
-    if (!user || user.state !== "awaiting_adjust_address" || !user.isAdmin) { // Проверяем только isAdmin
+    if (!user || user.state !== "awaiting_adjust_address" || !user.isAdmin) {
       await sendMessage(chatId, "У вас нет прав для этой операции.");
       await answerCallback(callbackId);
       return new Response('OK', { status: 200 });
@@ -164,9 +164,8 @@ export async function processCallback(callbackQuery, env) {
       await answerCallback(callbackId);
       return new Response('OK', { status: 200 });
     }
-    await sendMessage(chatId, "Debug: Point found " + JSON.stringify(point)); // Отладка
     userData.set(userId, { ...user, pointName, address: point.address, state: "awaiting_adjust_slots" });
-    await sendMessage(chatId, `Текущее количество мест: ${point.slots || 0}\n\nВведите количество мест:`);
+    await sendMessage(chatId, `Текущее количество мест: ${point.slots || 0}\n\nВведите новое количество мест:`);
     await answerCallback(callbackId);
     return new Response('OK', { status: 200 });
   }
@@ -311,9 +310,9 @@ export async function processNameInput(message, env) {
     return new Response('OK', { status: 200 });
   }
 
-  if (user.state === "awaiting_adjust_slots" && user.isAdmin) { // Проверяем только isAdmin
-    const delta = parseInt(text, 10);
-    if (isNaN(delta)) {
+  if (user.state === "awaiting_adjust_slots" && user.isAdmin) {
+    const newSlots = parseInt(text, 10);
+    if (isNaN(newSlots)) {
       await sendMessage(chatId, "Пожалуйста, введите корректное число.");
       return new Response('OK', { status: 200 });
     }
@@ -337,7 +336,7 @@ export async function processNameInput(message, env) {
       userData.delete(userId);
       return new Response('OK', { status: 200 });
     }
-    point.slots = (point.slots || 0) + delta; // Обновляем слоты
+    point.slots = newSlots; // Устанавливаем новое количество слотов
     await env[ADDRESSES_KV].put(user.cafe, JSON.stringify(points));
     await sendMessage(chatId, "Спасибо, места скорректированы");
     await sendMessage(GROUP_ID, `Скорректированы места\n\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}\nТекущее количество мест: ${point.slots}`);
@@ -345,5 +344,6 @@ export async function processNameInput(message, env) {
     return new Response('OK', { status: 200 });
   }
 
+  await sendMessage(chatId, "Неизвестная команда. Попробуйте /start."); // Добавляем обработку неизвестного ввода
   return new Response('OK', { status: 200 });
 }
