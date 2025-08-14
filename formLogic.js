@@ -10,6 +10,7 @@ const cafeNames = {
 const ADDRESSES_KV = "sq_adresses";
 const RESULTS_KV = "sq_checked";
 const RESUME_KV = "sq-resume";
+const SLOTS_KV = "sq_slots"; // KV для статуса точек
 const GROUP_ID = "-1002607218317"; // заменить на ваш id
 
 export async function startFlow(chatId, env) {
@@ -49,10 +50,23 @@ export async function processCallback(callbackQuery, env) {
       return new Response('OK', { status: 200 });
     }
     const points = JSON.parse(pointsRaw); // [{ name, address }]
+    // Получаем статусы точек из KV
+    const slotsRaw = await env[SLOTS_KV].get(cafeKey);
+    let slots = {};
+    if (slotsRaw) {
+      slots = JSON.parse(slotsRaw); // { pointName: true/false }
+    }
+    // Фильтруем только свободные точки
+    const availablePoints = points.filter(point => !slots[point.name]);
+    if (availablePoints.length === 0) {
+      await sendMessage(chatId, "Нет точек для регистрации, попробуйте позже.");
+      await answerCallback(callbackId);
+      return new Response('OK', { status: 200 });
+    }
     const user = userData.get(userId) || {};
-    userData.set(userId, { ...user, state: "awaiting_address", cafe: cafeKey, points });
+    userData.set(userId, { ...user, state: "awaiting_address", cafe: cafeKey, points: availablePoints });
     const keyboard = {
-      inline_keyboard: points.map(point => [
+      inline_keyboard: availablePoints.map(point => [
         { text: point.address, callback_data: `address_${point.name}` }
       ])
     };
@@ -79,6 +93,15 @@ export async function processCallback(callbackQuery, env) {
     const user = userData.get(userId);
     if (!user || user.state !== "awaiting_address") {
       await sendMessage(chatId, "Бот предназначен для тайных дегустаторов.\n\nДля начала введите /start");
+      await answerCallback(callbackId);
+      return new Response('OK', { status: 200 });
+    }
+    // Проверяем, свободна ли точка
+    const slotsRaw = await env[SLOTS_KV].get(user.cafe);
+    let slots = {};
+    if (slotsRaw) slots = JSON.parse(slotsRaw);
+    if (slots[pointName]) {
+      await sendMessage(chatId, "Эта точка уже занята.");
       await answerCallback(callbackId);
       return new Response('OK', { status: 200 });
     }
@@ -197,6 +220,12 @@ export async function processNameInput(message, env) {
     try {
       if (user.mode === "candidate") {
         await env[RESUME_KV].put(`${userId}_${Date.now()}`, JSON.stringify(result));
+        // Помечаем точку как занятую
+        const slotsRaw = await env[SLOTS_KV].get(user.cafe);
+        let slots = {};
+        if (slotsRaw) slots = JSON.parse(slotsRaw);
+        slots[user.pointName] = true;
+        await env[SLOTS_KV].put(user.cafe, JSON.stringify(slots));
       } else {
         await env[RESULTS_KV].put(`${userId}_${Date.now()}`, JSON.stringify(result));
       }
