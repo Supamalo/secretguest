@@ -178,6 +178,7 @@ export async function processNameInput(message, env) {
     await sendMessage(chatId, "Бот предназначен для тайных дегустаторов.\n\nДля начала введите /start");
     return new Response('OK', { status: 200 });
   }
+
   if (user.state === "awaiting_name") {
     const nameParts = text.trim().split(/\s+/);
     if (nameParts.length < 2) {
@@ -197,6 +198,7 @@ export async function processNameInput(message, env) {
     await sendMessage(chatId, "Укажите пожалуйста номер телефона для связи (начиная с +7 или 8):", keyboard);
     return new Response('OK', { status: 200 });
   }
+
   if (user.state === "awaiting_phone") {
     let phone;
     if (contact && contact.phone_number) {
@@ -245,7 +247,7 @@ export async function processNameInput(message, env) {
       return new Response('OK', { status: 200 });
     }
     const now = new Date();
-    const dateStr = `${now.getDate().toString().padStart(2, '0')}.${(now.getMonth()+1).toString().padStart(2, '0')}.${now.getFullYear()}`;
+    const dateStr = `${now.getDate().toString().padStart(2, '0')}.${(now.getMonth() + 1).toString().padStart(2, '0')}.${now.getFullYear()}`;
     const result = {
       telegramId: userId,
       username: message.from.username || '',
@@ -296,6 +298,7 @@ export async function processNameInput(message, env) {
     userData.delete(userId);
     return new Response('OK', { status: 200 });
   }
+
   if (user.state === "awaiting_adjust_slots" && ADMIN_IDS.includes(userId)) {
     const delta = parseInt(text, 10);
     if (isNaN(delta)) {
@@ -303,16 +306,25 @@ export async function processNameInput(message, env) {
       return new Response('OK', { status: 200 });
     }
     const pointsRaw = await env[ADDRESSES_KV].get(user.cafe);
+    if (!pointsRaw) {
+      await sendMessage(chatId, "Ошибка: данные сети не найдены.");
+      userData.delete(userId);
+      return new Response('OK', { status: 200 });
+    }
     let points = JSON.parse(pointsRaw);
     const point = points.find(p => p.name === user.pointName);
-    if (point) {
-      point.slots += delta; // Разрешаем отрицательные и положительные значения
-      await env[ADDRESSES_KV].put(user.cafe, JSON.stringify(points));
-      await sendMessage(chatId, "Спасибо, места скорректированы");
-      await sendMessage(GROUP_ID, `Скорректированы места\n\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}\nТекущее количество мест: ${point.slots}`);
+    if (!point) {
+      await sendMessage(chatId, "Ошибка: точка не найдена.");
+      userData.delete(userId);
+      return new Response('OK', { status: 200 });
     }
+    point.slots = (point.slots || 0) + delta; // Явно обновляем значение слотов
+    await env[ADDRESSES_KV].put(user.cafe, JSON.stringify(points));
+    await sendMessage(chatId, "Спасибо, места скорректированы");
+    await sendMessage(GROUP_ID, `Скорректированы места\n\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}\nТекущее количество мест: ${point.slots}`);
     userData.delete(userId);
     return new Response('OK', { status: 200 });
   }
+
   return new Response('OK', { status: 200 });
 }
