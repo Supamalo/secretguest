@@ -116,7 +116,8 @@ export async function processCallback(callbackQuery, env) {
       await answerCallback(callbackId);
       return new Response("OK");
     }
-    await saveUserState(env, userId, { state: "awaiting_adjust_address", cafe: cafeKey, points, isAdmin: true });
+    // Не сохраняем points в состояние пользователя
+    await saveUserState(env, userId, { state: "awaiting_adjust_address", cafe: cafeKey, isAdmin: ADMIN_IDS.includes(userId.toString()) });
     const keyboard = {
       inline_keyboard: points.map(p => [
         { text: p.address, callback_data: `adjust_address_${p.name}` }
@@ -181,13 +182,16 @@ export async function processCallback(callbackQuery, env) {
       await answerCallback(callbackId);
       return new Response("OK");
     }
-    const point = user.points.find(p => p.name === pointName);
+    // Получаем актуальный список точек из KV
+    const pointsRaw = await env[ADDRESSES_KV].get(user.cafe);
+    let points = pointsRaw ? JSON.parse(pointsRaw) : [];
+    const point = points.find(p => p.name === pointName);
     if (!point) {
       await sendMessage(chatId, "Точка не найдена.");
       await answerCallback(callbackId);
       return new Response("OK");
     }
-    await saveUserState(env, userId, { ...user, pointName, address: point.address, state: "awaiting_adjust_slots" });
+    await saveUserState(env, userId, { ...user, pointName, address: point.address, state: "awaiting_adjust_slots", isAdmin: ADMIN_IDS.includes(userId.toString()) });
     await sendMessage(chatId, `Текущее количество мест: ${point.slots || 0}\n\nВведите новое количество мест:`);
     await answerCallback(callbackId);
     return new Response("OK");
