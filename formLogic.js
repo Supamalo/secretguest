@@ -252,7 +252,7 @@ export async function processNameInput(message, env) {
     await env[RESULTS_KV].put(`${userId}_${Date.now()}`, JSON.stringify(result));
 
     await sendMessage(chatId, "Спасибо, ваша заявка принята!");
-    await sendMessage(GROUP_ID, `Новая заявка:\nИмя: ${result.name}\nТелефон: ${result.phone}\nСеть: ${cafeNames[result.cafe]}\nАдрес: ${result.address}`);
+      await sendMessage(GROUP_ID, `Заявка на проверку:\nИмя: ${result.name}\nТелефон: ${result.phone}\nСеть: ${cafeNames[result.cafe]}\nАдрес: ${result.address}`);
 
     await clearUserState(env, userId);
     return new Response("OK");
@@ -271,7 +271,11 @@ export async function processNameInput(message, env) {
       const points = JSON.parse(pointsRaw);
       const point = points.find(p => p.name === user.pointName);
       if (!point) throw new Error("Ошибка: точка не найдена.");
-      point.slots = newSlots;
+        if (newSlots < 0) {
+          await sendMessage(chatId, "Введите корректное число мест:");
+          return new Response("OK");
+        }
+        point.slots = newSlots;
       await env[ADDRESSES_KV].put(user.cafe, JSON.stringify(points));
       await sendMessage(chatId, "Спасибо, места скорректированы");
       await sendMessage(GROUP_ID, `Скорректированы места\n\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}\nТекущее количество мест: ${point.slots}`);
