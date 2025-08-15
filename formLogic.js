@@ -12,7 +12,7 @@ const RESULTS_KV = "sq_checked";
 const RESUME_KV = "sq-resume";
 
 const GROUP_ID = "-1002607218317";
-const ADMIN_IDS = ["642127857"];
+const ADMIN_IDS = ["642127857","6062747639"];
 
 // ===== helpers для состояния =====
 // Удалено: состояние пользователя не сохраняется в KV
@@ -305,4 +305,5 @@ export async function processNameInput(message, env) {
   await sendMessage(chatId, "Неизвестная команда. Попробуйте /start.");
   return new Response("OK");
 }
+
 
