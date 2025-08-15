@@ -261,24 +261,25 @@ export async function processNameInput(message, env) {
   // Корректировка мест админом
   if (user.state === "awaiting_adjust_slots" && user.isAdmin) {
     const newSlots = parseInt(text, 10);
-    if (isNaN(newSlots)) {
-      await sendMessage(chatId, "Пожалуйста, введите корректное число.");
+    if (isNaN(newSlots) || newSlots < 0) {
+      await sendMessage(chatId, "Введите корректное число мест:");
       return new Response("OK");
     }
     try {
+      // Получаем актуальный список точек из KV
       const pointsRaw = await env[ADDRESSES_KV].get(user.cafe);
-      if (!pointsRaw) throw new Error("Ошибка: данные сети не найдены.");
-      const points = JSON.parse(pointsRaw);
-      const point = points.find(p => p.name === user.pointName);
-      if (!point) throw new Error("Ошибка: точка не найдена.");
-        if (newSlots < 0) {
-          await sendMessage(chatId, "Введите корректное число мест:");
-          return new Response("OK");
-        }
-        point.slots = newSlots;
+      let points = pointsRaw ? JSON.parse(pointsRaw) : [];
+      // Находим нужную точку
+      const idx = points.findIndex(p => p.name === user.pointName);
+      if (idx === -1) {
+        await sendMessage(chatId, "Точка не найдена.");
+        await clearUserState(env, userId);
+        return new Response("OK");
+      }
+      points[idx].slots = newSlots;
       await env[ADDRESSES_KV].put(user.cafe, JSON.stringify(points));
-      await sendMessage(chatId, "Спасибо, места скорректированы");
-      await sendMessage(GROUP_ID, `Скорректированы места\n\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${user.address}\nТекущее количество мест: ${point.slots}`);
+      await sendMessage(chatId, `Спасибо, места скорректированы. Текущее количество мест: ${newSlots}`);
+      await sendMessage(GROUP_ID, `Скорректированы места\n\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${points[idx].address}\nТекущее количество мест: ${newSlots}`);
     } catch (e) {
       await sendMessage(chatId, e.message || "Ошибка при сохранении.");
     }
