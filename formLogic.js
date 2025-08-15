@@ -1,5 +1,4 @@
 import { sendMessage, answerCallback } from './telegramApi.js';
-import { userData } from './main.js';
 
 const cafeNames = {
   // croissant: "Круассан кафе", // скрыто по просьбе
@@ -10,22 +9,12 @@ const cafeNames = {
 const ADDRESSES_KV = "sq_adresses";
 const RESULTS_KV = "sq_checked";
 const RESUME_KV = "sq-resume";
-const USER_STATE_KV = "sq_user_state";
 
 const GROUP_ID = "-1002607218317";
 const ADMIN_IDS = ["642127857"];
 
 // ===== helpers для состояния =====
-async function saveUserState(env, userId, data) {
-  await env[USER_STATE_KV].put(userId.toString(), JSON.stringify(data));
-}
-async function getUserState(env, userId) {
-  const raw = await env[USER_STATE_KV].get(userId.toString());
-  return raw ? JSON.parse(raw) : null;
-}
-async function clearUserState(env, userId) {
-  await env[USER_STATE_KV].delete(userId.toString());
-}
+// Удалено: состояние пользователя не сохраняется в KV
 
 // ===== старт =====
 export async function startFlow(chatId, env) {
@@ -48,7 +37,6 @@ export async function processCallback(callbackQuery, env) {
 
   // Режим кандидата
   if (data === "mode_candidate") {
-    await saveUserState(env, userId, { mode: "candidate" });
     const keyboard = {
       inline_keyboard: Object.entries(cafeNames).map(([key, name]) => [
         { text: name, callback_data: `cafe_${key}` }
@@ -61,7 +49,6 @@ export async function processCallback(callbackQuery, env) {
 
   // Режим корректировки мест (только для админов)
   if (data === "mode_adjust_slots" && ADMIN_IDS.includes(userId.toString())) {
-    await saveUserState(env, userId, { mode: "adjust_slots", isAdmin: true });
     const keyboard = {
       inline_keyboard: Object.entries(cafeNames).map(([key, name]) => [
         { text: name, callback_data: `cafe_adjust_${key}` }
@@ -88,7 +75,8 @@ export async function processCallback(callbackQuery, env) {
       await answerCallback(callbackId);
       return new Response("OK");
     }
-    await saveUserState(env, userId, { state: "awaiting_address", cafe: cafeKey });
+    // Сохраняем состояние только в памяти, если нужно
+    userData.set(userId, { state: "awaiting_address", cafe: cafeKey });
     const keyboard = {
       inline_keyboard: availablePoints.map(p => [
         { text: p.address, callback_data: `address_${p.name}` }
@@ -116,8 +104,8 @@ export async function processCallback(callbackQuery, env) {
       await answerCallback(callbackId);
       return new Response("OK");
     }
-    // Не сохраняем points в состояние пользователя
-    await saveUserState(env, userId, { state: "awaiting_adjust_address", cafe: cafeKey, isAdmin: ADMIN_IDS.includes(userId.toString()) });
+    // Сохраняем состояние только в памяти, если нужно
+    userData.set(userId, { state: "awaiting_adjust_address", cafe: cafeKey, isAdmin: ADMIN_IDS.includes(userId.toString()) });
     const keyboard = {
       inline_keyboard: points.map(p => [
         { text: p.address, callback_data: `adjust_address_${p.name}` }
@@ -130,8 +118,8 @@ export async function processCallback(callbackQuery, env) {
 
   // Кнопка возврата
   if (data === "back_to_cafes") {
-    const user = await getUserState(env, userId) || {};
-    await saveUserState(env, userId, { mode: user.mode });
+    const user = userData.get(userId) || {};
+    userData.set(userId, { mode: user.mode });
     const keyboard = {
       inline_keyboard: Object.entries(cafeNames).map(([key, name]) => [
         { text: name, callback_data: `cafe_${key}` }
@@ -145,7 +133,7 @@ export async function processCallback(callbackQuery, env) {
   // Выбор точки кандидатом (адрес)
   if (data.startsWith("address_")) {
     const pointName = data.replace("address_", "");
-    const user = await getUserState(env, userId);
+    const user = userData.get(userId);
     if (!user || user.state !== "awaiting_address") {
       await sendMessage(chatId, "Бот предназначен для тайных дегустаторов.\n\nДля начала введите /start");
       await answerCallback(callbackId);
@@ -164,7 +152,7 @@ export async function processCallback(callbackQuery, env) {
       await answerCallback(callbackId);
       return new Response("OK");
     }
-    await saveUserState(env, userId, { ...user, address: point.address, pointName, state: "awaiting_name" });
+    userData.set(userId, { ...user, address: point.address, pointName, state: "awaiting_name" });
     const keyboard = {
       inline_keyboard: [[{ text: "Вернуться к списку", callback_data: "back_to_cafes" }]]
     };
@@ -176,7 +164,7 @@ export async function processCallback(callbackQuery, env) {
   // Выбор точки для корректировки (новое количество мест)
   if (data.startsWith("adjust_address_")) {
     const pointName = data.replace("adjust_address_", "");
-    const user = await getUserState(env, userId);
+    const user = userData.get(userId);
     if (!user || user.state !== "awaiting_adjust_address" || !user.isAdmin) {
       await sendMessage(chatId, "У вас нет прав для этой операции.");
       await answerCallback(callbackId);
@@ -191,7 +179,7 @@ export async function processCallback(callbackQuery, env) {
       await answerCallback(callbackId);
       return new Response("OK");
     }
-    await saveUserState(env, userId, { ...user, pointName, address: point.address, state: "awaiting_adjust_slots", isAdmin: ADMIN_IDS.includes(userId.toString()) });
+    userData.set(userId, { ...user, pointName, address: point.address, state: "awaiting_adjust_slots", isAdmin: ADMIN_IDS.includes(userId.toString()) });
     await sendMessage(chatId, `Текущее количество мест: ${point.slots || 0}\n\nВведите новое количество мест:`);
     await answerCallback(callbackId);
     return new Response("OK");
@@ -210,7 +198,7 @@ export async function processNameInput(message, env) {
     return startFlow(chatId, env);
   }
 
-  const user = await getUserState(env, userId);
+  const user = userData.get(userId);
   if (!user) {
     await sendMessage(chatId, "Бот предназначен для тайных дегустаторов.\n\nДля начала введите /start");
     return new Response("OK");
@@ -222,7 +210,7 @@ export async function processNameInput(message, env) {
       await sendMessage(chatId, "Введите фамилию и имя через пробел:");
       return new Response("OK");
     }
-    await saveUserState(env, userId, { ...user, name: text.trim(), state: "awaiting_phone" });
+    userData.set(userId, { ...user, name: text.trim(), state: "awaiting_phone" });
     await sendMessage(chatId, "Отправьте номер телефона (кнопкой 'Отправить номер' или вручную в формате +7...)");
     return new Response("OK");
   }
@@ -256,9 +244,9 @@ export async function processNameInput(message, env) {
     await env[RESULTS_KV].put(`${userId}_${Date.now()}`, JSON.stringify(result));
 
     await sendMessage(chatId, "Спасибо, ваша заявка принята!");
-      await sendMessage(GROUP_ID, `Заявка на проверку:\nИмя: ${result.name}\nТелефон: ${result.phone}\nСеть: ${cafeNames[result.cafe]}\nАдрес: ${result.address}`);
+    await sendMessage(GROUP_ID, `Заявка на проверку:\nИмя: ${result.name}\nТелефон: ${result.phone}\nСеть: ${cafeNames[result.cafe]}\nАдрес: ${result.address}`);
 
-    await clearUserState(env, userId);
+    userData.delete(userId);
     return new Response("OK");
   }
 
@@ -277,7 +265,7 @@ export async function processNameInput(message, env) {
       const idx = points.findIndex(p => p.name === user.pointName);
       if (idx === -1) {
         await sendMessage(chatId, "Точка не найдена.");
-        await clearUserState(env, userId);
+        userData.delete(userId);
         return new Response("OK");
       }
       points[idx].slots = newSlots;
@@ -287,7 +275,7 @@ export async function processNameInput(message, env) {
     } catch (e) {
       await sendMessage(chatId, e.message || "Ошибка при сохранении.");
     }
-    await clearUserState(env, userId);
+    userData.delete(userId);
     return new Response("OK");
   }
 
