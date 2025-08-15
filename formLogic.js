@@ -261,8 +261,8 @@ export async function processNameInput(message, env) {
     await env[RESULTS_KV].put(`${userId}_${Date.now()}`, JSON.stringify(result));
 
     await sendMessage(chatId, "Спасибо, ваша заявка принята!");
-    // Формируем сообщение для канала с username
-    let channelMsg = `Заявка на проверку:\n\nКандидат: ${result.name}`;
+    // Формируем сообщение для канала с username (только если есть)
+    let channelMsg = `Заявка на проверку:\nКандидат: ${result.name}`;
     if (result.username) {
       channelMsg += `\nUsername: @${result.username}`;
     }
@@ -294,7 +294,16 @@ export async function processNameInput(message, env) {
       points[idx].slots = newSlots;
       await env[ADDRESSES_KV].put(user.cafe, JSON.stringify(points));
       await sendMessage(chatId, `Спасибо, места скорректированы. Текущее количество мест: ${newSlots}`);
-      await sendMessage(GROUP_ID, `Скорректированы места\n\nСеть: ${cafeNames[user.cafe]}\nАдрес: ${points[idx].address}\nТекущее количество мест: ${newSlots}`);
+
+      // Получаем username для админского сообщения
+      const username = message.from && message.from.username ? message.from.username : null;
+      let adminMsg = `Скорректированы места\n\n`;
+      if (username) {
+        adminMsg += `Username: @${username}\n\n`;
+      }
+      adminMsg += `Сеть: ${cafeNames[user.cafe]}\nАдрес: ${points[idx].address}\nТекущее количество мест: ${newSlots}`;
+      await sendMessage(GROUP_ID, adminMsg);
+
     } catch (e) {
       await sendMessage(chatId, e.message || "Ошибка при сохранении.");
     }
@@ -305,5 +314,3 @@ export async function processNameInput(message, env) {
   await sendMessage(chatId, "Неизвестная команда. Попробуйте /start.");
   return new Response("OK");
 }
-
-
