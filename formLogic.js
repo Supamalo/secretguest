@@ -262,7 +262,7 @@ export async function processNameInput(message, env) {
 
     await sendMessage(chatId, "Спасибо, ваша заявка принята!");
     // Формируем сообщение для канала с username (только если есть)
-    let channelMsg = `Заявка на проверку:\nКандидат: ${result.name}`;
+    let channelMsg = `Заявка на проверку:\n\nКандидат: ${result.name}`;
     if (result.username) {
       channelMsg += `\nUsername: @${result.username}`;
     }
@@ -314,3 +314,4 @@ export async function processNameInput(message, env) {
   await sendMessage(chatId, "Неизвестная команда. Попробуйте /start.");
   return new Response("OK");
 }
+
