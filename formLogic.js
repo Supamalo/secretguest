@@ -1,4 +1,5 @@
 import { sendMessage, answerCallback } from './telegramApi.js';
+import { userData } from './main.js';
 
 const cafeNames = {
   // croissant: "Круассан кафе", // скрыто по просьбе
