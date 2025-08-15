@@ -18,6 +18,8 @@ const ADMIN_IDS = ["642127857"];
 
 // ===== старт =====
 export async function startFlow(chatId, env) {
+  // Сохраняем пустое состояние пользователя при старте
+  userData.set(chatId, {});
   const keyboard = {
     inline_keyboard: [
       [{ text: "Хочу быть дегустатором", callback_data: "mode_candidate" }],
@@ -37,6 +39,7 @@ export async function processCallback(callbackQuery, env) {
 
   // Режим кандидата
   if (data === "mode_candidate") {
+    userData.set(userId, { mode: "candidate" });
     const keyboard = {
       inline_keyboard: Object.entries(cafeNames).map(([key, name]) => [
         { text: name, callback_data: `cafe_${key}` }
@@ -49,6 +52,7 @@ export async function processCallback(callbackQuery, env) {
 
   // Режим корректировки мест (только для админов)
   if (data === "mode_adjust_slots" && ADMIN_IDS.includes(userId.toString())) {
+    userData.set(userId, { mode: "adjust_slots", isAdmin: true });
     const keyboard = {
       inline_keyboard: Object.entries(cafeNames).map(([key, name]) => [
         { text: name, callback_data: `cafe_adjust_${key}` }
