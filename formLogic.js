@@ -216,7 +216,15 @@ export async function processNameInput(message, env) {
       return new Response("OK");
     }
     userData.set(userId, { ...user, name: text.trim(), state: "awaiting_phone" });
-    await sendMessage(chatId, "Отправьте номер телефона (кнопкой 'Отправить номер' или вручную в формате +7...)");
+    // Добавляем кнопку "Отправить номер"
+    const keyboard = {
+      keyboard: [
+        [{ text: "Отправить номер", request_contact: true }]
+      ],
+      resize_keyboard: true,
+      one_time_keyboard: true
+    };
+    await sendMessage(chatId, "Отправьте номер телефона (кнопкой 'Отправить номер' или вручную в формате +7...)", keyboard);
     return new Response("OK");
   }
 
@@ -240,16 +248,26 @@ export async function processNameInput(message, env) {
       await env[ADDRESSES_KV].put(user.cafe, JSON.stringify(points));
     }
 
+    // Получаем username
+    const username = message.from && message.from.username ? message.from.username : null;
+
     const result = {
       name: user.name,
       phone: phone,
       cafe: user.cafe,
-      address: user.address
+      address: user.address,
+      username: username
     };
     await env[RESULTS_KV].put(`${userId}_${Date.now()}`, JSON.stringify(result));
 
     await sendMessage(chatId, "Спасибо, ваша заявка принята!");
-    await sendMessage(GROUP_ID, `Заявка на проверку:\nИмя: ${result.name}\nТелефон: ${result.phone}\nСеть: ${cafeNames[result.cafe]}\nАдрес: ${result.address}`);
+    // Формируем сообщение для канала с username
+    let channelMsg = `Заявка на проверку:\nКандидат: ${result.name}`;
+    if (result.username) {
+      channelMsg += `\nUsername: @${result.username}`;
+    }
+    channelMsg += `\nТелефон: ${result.phone}\nСеть: ${cafeNames[result.cafe]}\nАдрес: ${result.address}`;
+    await sendMessage(GROUP_ID, channelMsg);
 
     userData.delete(userId);
     return new Response("OK");
