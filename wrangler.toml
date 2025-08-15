@@ -14,13 +14,10 @@ id = "c471ea526eb54f139b8b0be93f6a30ba"
 binding = "sq-resume"
 id = "54797a170ca3405b90972873792ebdcf"
 
-[[kv_namespaces]]
-binding = "sq_user_state"
-id = "fc25cf85746f4f20a3fc1af8f153940a"
-
 [logs]
 level = "info"
 enabled = true
 
 [observability.logs]
 enabled = true
+
