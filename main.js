@@ -5,12 +5,12 @@ async function handleRequest(request, env) {
     const data = await request.json();
     const { message, callback_query } = data;
     if (message && message.text === '/start') {
-      return await startFlow(message.chat.id, env);
+      return await startFlow(message.chat.id, env, userData);
     } else if (message && (message.text || message.contact)) {
       // Всегда пробуем обработать текстовое сообщение через processNameInput
-      return await processNameInput(message, env);
+      return await processNameInput(message, env, userData);
     } else if (callback_query && callback_query.data) {
-      return await processCallback(callback_query, env);
+      return await processCallback(callback_query, env, userData);
     }
   }
   return new Response('OK', { status: 200 });
