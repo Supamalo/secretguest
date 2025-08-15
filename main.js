@@ -6,11 +6,9 @@ async function handleRequest(request, env) {
     const { message, callback_query } = data;
     if (message && message.text === '/start') {
       return await startFlow(message.chat.id, env);
-    } else if (message && (message.text || message.contact) && userData.has(message.from.id)) {
-      const user = userData.get(message.from.id);
-      if (user.state === 'awaiting_name' || user.state === 'awaiting_phone') {
-        return await processNameInput(message, env);
-      }
+    } else if (message && (message.text || message.contact)) {
+      // Всегда пробуем обработать текстовое сообщение через processNameInput
+      return await processNameInput(message, env);
     } else if (callback_query && callback_query.data) {
       return await processCallback(callback_query, env);
     }
